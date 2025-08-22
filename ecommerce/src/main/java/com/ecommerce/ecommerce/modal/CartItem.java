@@ -10,7 +10,7 @@ import lombok.*;
 @Getter
 @AllArgsConstructor
 @NoArgsConstructor
-@EqualsAndHashCode
+//@EqualsAndHashCode
 public class CartItem {
 
     @Id

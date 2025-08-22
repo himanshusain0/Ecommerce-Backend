@@ -4,7 +4,6 @@ import jakarta.persistence.*;
 import jakarta.validation.constraints.NotNull;
 import lombok.*;
 
-
 @Entity
 @Setter
 @Getter
@@ -17,18 +16,14 @@ public class Category {
     @GeneratedValue(strategy = GenerationType.AUTO)
     private Long id;
 
+    private String name;  // Added this field to prevent null issues
 
-    @NotNull
     @Column(unique = true)
     private String categoryId;
 
     @ManyToOne
-    private  Category parentCategory;
+    private Category parentCategory;
 
     @NotNull
     private Integer level;
-
-
-
-
 }

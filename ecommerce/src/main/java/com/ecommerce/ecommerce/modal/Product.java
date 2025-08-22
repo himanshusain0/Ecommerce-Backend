@@ -1,4 +1,3 @@
-
 package com.ecommerce.ecommerce.modal;
 
 import jakarta.persistence.*;
@@ -35,7 +34,7 @@ public class Product {
     private int numRatings;
 
     @ManyToOne
-    @JoinColumn(name = "category_id")
+    @JoinColumn(name = "category_id", nullable = false)
     private Category category;
 
     @ManyToOne
@@ -44,12 +43,11 @@ public class Product {
 
     private LocalDateTime createdAt;
 
-    private String sizes; // Changed to lowercase
+    private String sizes;
 
     @OneToMany(mappedBy = "product", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<Review> reviews = new ArrayList<>();
 
-    // Business logic methods
     public void addReview(Review review) {
         reviews.add(review);
         review.setProduct(this);

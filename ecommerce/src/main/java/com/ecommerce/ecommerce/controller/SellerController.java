@@ -2,13 +2,16 @@ package com.ecommerce.ecommerce.controller;
 
 import com.ecommerce.ecommerce.config.JwtProvider;
 import com.ecommerce.ecommerce.domain.AccountStatus;
+import com.ecommerce.ecommerce.exceptions.SellerException;
 import com.ecommerce.ecommerce.modal.Seller;
+import com.ecommerce.ecommerce.modal.SellerReport;
 import com.ecommerce.ecommerce.modal.VerificationCode;
 import com.ecommerce.ecommerce.repository.VerificationCodeRepository;
 import com.ecommerce.ecommerce.request.LoginRequest;
 import com.ecommerce.ecommerce.response.AuthResponse;
 import com.ecommerce.ecommerce.service.AuthService;
 import com.ecommerce.ecommerce.service.EmailService;
+import com.ecommerce.ecommerce.service.SellerReportService;
 import com.ecommerce.ecommerce.service.SellerService;
 import com.ecommerce.ecommerce.utils.OtpUtil;
 import lombok.RequiredArgsConstructor;
@@ -28,6 +31,7 @@ public class SellerController {
     private final AuthService authService;
     private final EmailService emailService;
     private final JwtProvider jwtProvider;
+    private final SellerReportService sellerReportService;
 
     // -------------------- AUTH --------------------
     @PostMapping("/login")
@@ -68,7 +72,7 @@ public class SellerController {
 
     // -------------------- GET ONE --------------------
     @GetMapping("/{id}")
-    public ResponseEntity<Seller> getSellerById(@PathVariable Long id) throws Exception {
+    public ResponseEntity<Seller> getSellerById(@PathVariable Long id) throws SellerException {
         return ResponseEntity.ok(sellerService.getSellerById(id));
     }
 
@@ -100,5 +104,15 @@ public class SellerController {
     public ResponseEntity<Void> deleteSeller(@PathVariable Long id) throws Exception {
         sellerService.deleteSeller(id);
         return ResponseEntity.noContent().build();
+    }
+
+    @GetMapping("/report")
+    public ResponseEntity<SellerReport> getSellerReport(
+            @RequestHeader("Authorization") String jwt
+    ) throws Exception {
+//        String email = jwtProvider.getEmailFromJwtToken(jwt);
+        Seller seller = sellerService.getSellerProfile(jwt);
+        SellerReport report = sellerReportService.getSellerReport(seller);
+        return  new ResponseEntity<>(report,HttpStatus.OK);
     }
 }

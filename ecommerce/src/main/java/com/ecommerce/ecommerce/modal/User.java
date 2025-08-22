@@ -42,7 +42,7 @@ public class User {
 
    @NotNull(message = "Role is required")
     @Enumerated(EnumType.STRING)
-    private Role role = Role.ROLE_ADMIN;
+    private Role role = Role.ROLE_CUSTOMER;
 
     @OneToMany(cascade = CascadeType.ALL, orphanRemoval = true)
     @JoinColumn(name = "user_id")

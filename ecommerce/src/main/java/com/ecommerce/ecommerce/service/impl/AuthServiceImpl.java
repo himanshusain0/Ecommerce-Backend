@@ -16,8 +16,9 @@ import com.ecommerce.ecommerce.response.SignupRequest;
 import com.ecommerce.ecommerce.service.AuthService;
 import com.ecommerce.ecommerce.service.EmailService;
 import com.ecommerce.ecommerce.utils.OtpUtil;
+import jakarta.mail.MessagingException;
 import lombok.AllArgsConstructor;
-
+import org.springframework.http.HttpStatus;
 import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
@@ -27,6 +28,7 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
+import org.springframework.web.server.ResponseStatusException;
 
 import java.util.ArrayList;
 import java.util.Collection;
@@ -36,78 +38,89 @@ import java.util.List;
 @AllArgsConstructor
 public class AuthServiceImpl implements AuthService {
 
-
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
     private final CartRepository cartRepository;
     private final JwtProvider jwtProvider;
-    private  final VerificationCodeRepository verificationCodeRepository;
+    private final VerificationCodeRepository verificationCodeRepository;
     private final EmailService emailService;
     private final CustomUserServiceIml customUserServiceIml;
     private final SellerRepository sellerRepository;
 
-
     @Override
-    public void sentLoginOtp(String email ,Role role) throws Exception {
+    public void sentLoginOtp(String email, Role role) throws MessagingException {
         String SIGNING_PREFIX = "signing_";
+        boolean isSignupFlow = false;
 
-        if(email.startsWith(SIGNING_PREFIX)){
+        if (email.startsWith(SIGNING_PREFIX)) {
             email = email.substring(SIGNING_PREFIX.length());
-            if(role.equals(Role.ROLE_SELLER)){
-                Seller seller = sellerRepository.findByEmail(email);
-                if(seller == null){
-                    throw new Exception("Seller not found");
-                }
-            }
-            else{
-                User user = userRepository.findByEmail(email);
-                if(user == null){
-                    throw  new Exception("user not exist woth provided email");
-                }
-            }
-
+            isSignupFlow = true;
         }
-        VerificationCode isExist = verificationCodeRepository.findByEmail(email);
 
-        if(isExist != null){
+        if (isSignupFlow) {
+            // Signup flow
+            if (role.equals(Role.ROLE_SELLER)) {
+                Seller seller = sellerRepository.findByEmail(email);
+                if (seller != null) {
+                    throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Seller already exists with this email");
+                }
+            } else {
+                User user = userRepository.findByEmail(email);
+                if (user != null) {
+                    throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "User already exists with this email");
+                }
+            }
+        } else {
+            // Login flow
+            if (role.equals(Role.ROLE_SELLER)) {
+                Seller seller = sellerRepository.findByEmail(email);
+                if (seller == null) {
+                    throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Seller not found");
+                }
+            } else {
+                User user = userRepository.findByEmail(email);
+                if (user == null) {
+                    throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "User not found with provided email");
+                }
+            }
+        }
+
+        // Delete old OTP if exists
+        VerificationCode isExist = verificationCodeRepository.findByEmail(email);
+        if (isExist != null) {
             verificationCodeRepository.delete(isExist);
         }
 
+        // Generate and save new OTP
         String otp = OtpUtil.generateOtp();
         VerificationCode verificationCode = new VerificationCode();
         verificationCode.setOtp(otp);
         verificationCode.setEmail(email);
         verificationCodeRepository.save(verificationCode);
 
-        String subject = "apna bazar login/signup otp";
-        String text = "your login/signup  otp  is - " + otp;
-
+        // Send OTP mail
+        String subject = "Apna Bazar Login/Signup OTP";
+        String text = "Your login/signup OTP is: " + otp;
         emailService.sendVerificationOtpEmail(email,otp,subject,text);
-
-
     }
 
     @Override
     public String createUser(SignupRequest req) throws Exception {
-
-
         VerificationCode verificationCode = verificationCodeRepository.findByEmail(req.getEmail());
-        if(verificationCode == null || !verificationCode.getOtp().equals(req.getOtp()) ){
-            throw  new Exception("Wrong Otp");
+        if (verificationCode == null || !verificationCode.getOtp().equals(req.getOtp())) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Wrong OTP");
         }
 
         User user = userRepository.findByEmail(req.getEmail());
-
-        if(user == null){
+        if (user == null) {
             User createdUser = new User();
-
             createdUser.setEmail(req.getEmail());
             createdUser.setFullName(req.getFullName());
-            createdUser.setRole(Role.ROLE_ADMIN);
+            createdUser.setRole(Role.ROLE_CUSTOMER); // Signup user = customer by default
             createdUser.setMobile("9641398563");
             createdUser.setPassword(passwordEncoder.encode(req.getOtp()));
 
-            user= userRepository.save(createdUser);
+            user = userRepository.save(createdUser);
 
             Cart cart = new Cart();
             cart.setUser(user);
@@ -115,63 +128,51 @@ public class AuthServiceImpl implements AuthService {
         }
 
         List<GrantedAuthority> authorities = new ArrayList<>();
+        authorities.add(new SimpleGrantedAuthority(user.getRole().toString()));
 
-        authorities.add(new SimpleGrantedAuthority(Role.ROLE_CUSTOMER.toString()));
-
-        Authentication authentication = new UsernamePasswordAuthenticationToken(req.getEmail(),null,authorities);
-
+        Authentication authentication = new UsernamePasswordAuthenticationToken(req.getEmail(), null, authorities);
         SecurityContextHolder.getContext().setAuthentication(authentication);
-        return  jwtProvider.generateToken(authentication);
 
-
+        return jwtProvider.generateToken(authentication);
     }
 
     @Override
     public AuthResponse siging(LoginRequest req) {
-       String username = req.getEmail();
-       String otp = req.getOtp();
-       Authentication authentication = authenticate(username,otp);
+        String username = req.getEmail();
+        String otp = req.getOtp();
+
+        Authentication authentication = authenticate(username, otp);
         SecurityContextHolder.getContext().setAuthentication(authentication);
 
         String token = jwtProvider.generateToken(authentication);
 
-        AuthResponse authResponse= new AuthResponse();
+        AuthResponse authResponse = new AuthResponse();
         authResponse.setJwt(token);
         authResponse.setMessage("Login Success");
 
-        Collection<? extends  GrantedAuthority> authorities = authentication.getAuthorities();
-        String roleName = authorities.isEmpty()?null:authorities.iterator().next().getAuthority();
+        Collection<? extends GrantedAuthority> authorities = authentication.getAuthorities();
+        String roleName = authorities.isEmpty() ? null : authorities.iterator().next().getAuthority();
         authResponse.setRole(Role.valueOf(roleName));
+
         return authResponse;
-
-
     }
 
     private Authentication authenticate(String username, String otp) {
+        String SELLER_PREFIX = "seller_";
+        if (username.startsWith(SELLER_PREFIX)) {
+            username = username.substring(SELLER_PREFIX.length());
+        }
 
         UserDetails userDetails = customUserServiceIml.loadUserByUsername(username);
-
-        String SELLER_PREFIX ="seller_";
-        if(username.startsWith(SELLER_PREFIX)){
-            username= username.substring(SELLER_PREFIX.length());
+        if (userDetails == null) {
+            throw new BadCredentialsException("Invalid username or OTP");
         }
-        if(userDetails == null){
-            throw new BadCredentialsException("Invalid username or password");
-
-
-        }
-
-
 
         VerificationCode verificationCode = verificationCodeRepository.findByEmail(username);
-
-        if(verificationCode == null || !verificationCode.getOtp().equals(otp) ){
-            throw new BadCredentialsException("wrong otp");
+        if (verificationCode == null || !verificationCode.getOtp().equals(otp)) {
+            throw new BadCredentialsException("Wrong OTP");
         }
 
-        return  new UsernamePasswordAuthenticationToken(userDetails,null,
-                userDetails.getAuthorities()
-                );
-
+        return new UsernamePasswordAuthenticationToken(userDetails, null, userDetails.getAuthorities());
     }
 }

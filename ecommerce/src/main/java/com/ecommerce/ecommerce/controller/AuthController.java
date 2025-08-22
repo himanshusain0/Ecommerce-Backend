@@ -37,7 +37,7 @@ public class AuthController {
         AuthResponse res = new AuthResponse();
         res.setJwt(jwt);
         res.setMessage("Register Success");
-        res.setRole(Role.ROLE_CUSTOMER);
+//        res.setRole(Role.ROLE_CUSTOMER);
         return  ResponseEntity.ok(res);
 
 
@@ -46,7 +46,7 @@ public class AuthController {
     @PostMapping("/sent/login-signup-otp")
     public ResponseEntity<ApiResonse> sentOtpHandler(@RequestBody LoginOtpRequest req) throws Exception {
 
-    authService.sentLoginOtp(req.getEmail(),req.getRole());
+        authService.sentLoginOtp(req.getEmail(),req.getRole());
 
         ApiResonse res = new ApiResonse();
 
@@ -54,7 +54,7 @@ public class AuthController {
         return  ResponseEntity.ok(res);
 
     }
-
+//
 
     @PostMapping("/signing")
     public ResponseEntity<AuthResponse> loginHandler(@RequestBody LoginRequest req) throws Exception {

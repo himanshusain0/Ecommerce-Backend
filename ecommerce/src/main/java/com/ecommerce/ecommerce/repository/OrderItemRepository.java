@@ -1,12 +1,11 @@
 package com.ecommerce.ecommerce.repository;
 
-import com.ecommerce.ecommerce.modal.Cart;
+import com.ecommerce.ecommerce.modal.Order;
+import com.ecommerce.ecommerce.modal.OrderItem;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 
-
 @Repository
-public interface CartRepository extends JpaRepository<Cart,Long> {
+public interface OrderItemRepository  extends JpaRepository<OrderItem,Long> {
 
-    Cart findByUserId(Long id);
 }
